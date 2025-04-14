@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Coins } from "@/components/ui/Coins";
 import { Button } from "@/components/ui/button";
 import { useCoin } from "@/context/CoinContext";
@@ -47,19 +47,9 @@ const AdPopup: React.FC<AdPopupProps> = ({ adId, onClose, open }) => {
     <>
       <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
         <DialogContent className="sm:max-w-md">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium">Watch Ad for Coins</h3>
-            {!isAdWatching && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                className="h-8 w-8 rounded-full"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+          <DialogHeader>
+            <DialogTitle>Watch Ad for Coins</DialogTitle>
+          </DialogHeader>
           
           <div className="space-y-4">
             {isAdWatching && adId === currentAdId ? (
@@ -67,7 +57,9 @@ const AdPopup: React.FC<AdPopupProps> = ({ adId, onClose, open }) => {
                 <div className="relative">
                   <div dangerouslySetInnerHTML={{ __html: currentAd.content }} />
                   <div className="absolute top-2 right-2">
-                    <div className="ad-countdown">{adTimeRemaining}</div>
+                    <div className="bg-black/70 text-white px-2 py-1 rounded-full text-sm">
+                      {adTimeRemaining}s
+                    </div>
                   </div>
                 </div>
                 <div className="text-center text-sm text-muted-foreground">

@@ -77,6 +77,16 @@ interface CoinContextType {
   adTimeRemaining: number;
   bannerAd: string;
   topBannerAd: string;
+  updateTask: (taskId: string, updatedTask: Partial<TaskType>) => void;
+  updateAd: (adId: string, updatedAd: Partial<AdType>) => void;
+  updateReward: (rewardId: string, updatedReward: Partial<RewardType>) => void;
+  addTask: (task: Omit<TaskType, "id" | "completed">) => void;
+  addAd: (ad: Omit<AdType, "id">) => void;
+  addReward: (reward: Omit<RewardType, "id">) => void;
+  removeTask: (taskId: string) => void;
+  removeAd: (adId: string) => void;
+  removeReward: (rewardId: string) => void;
+  updateWithdrawalRequestStatus: (requestId: string, status: "pending" | "approved" | "rejected") => void;
 }
 
 const CoinContext = createContext<CoinContextType | undefined>(undefined);
@@ -180,6 +190,11 @@ const MOCK_REWARDS: RewardType[] = [
   },
 ];
 
+// Determine if a user is an admin by checking their username and password
+const isAdminUser = (email: string, password: string) => {
+  return email === "anasgazi1" && password === "Anas1999@";
+};
+
 export const CoinProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<UserType | null>(null);
   const [tasks, setTasks] = useState<TaskType[]>(MOCK_TASKS);
@@ -197,13 +212,41 @@ export const CoinProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Local storage management
   useEffect(() => {
+    // Load tasks, ads, rewards and other settings from localStorage
+    const storedTasks = localStorage.getItem("coinQuestTasks");
+    const storedAds = localStorage.getItem("coinQuestAds");
+    const storedRewards = localStorage.getItem("coinQuestRewards");
+    const storedWithdrawalRequests = localStorage.getItem("coinQuestWithdrawalRequests");
     const storedUser = localStorage.getItem("coinQuestUser");
+    
+    if (storedTasks) setTasks(JSON.parse(storedTasks));
+    if (storedAds) setAds(JSON.parse(storedAds));
+    if (storedRewards) setRewards(JSON.parse(storedRewards));
+    if (storedWithdrawalRequests) setWithdrawalRequests(JSON.parse(storedWithdrawalRequests));
+    
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
       setCurrentUser(parsedUser);
       setIsAuthenticated(true);
     }
   }, []);
+
+  // Save data to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("coinQuestTasks", JSON.stringify(tasks));
+  }, [tasks]);
+
+  useEffect(() => {
+    localStorage.setItem("coinQuestAds", JSON.stringify(ads));
+  }, [ads]);
+
+  useEffect(() => {
+    localStorage.setItem("coinQuestRewards", JSON.stringify(rewards));
+  }, [rewards]);
+
+  useEffect(() => {
+    localStorage.setItem("coinQuestWithdrawalRequests", JSON.stringify(withdrawalRequests));
+  }, [withdrawalRequests]);
 
   // Ad timer effect
   useEffect(() => {
@@ -214,44 +257,30 @@ export const CoinProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setAdTimeRemaining((prev) => prev - 1);
       }, 1000);
     } else if (adTimeRemaining === 0 && isAdWatching && currentAdId) {
-      // Ad completed
+      // Ad completed but waiting for manual claim
       setIsAdWatching(false);
-      const ad = ads.find((a) => a.id === currentAdId);
-      if (ad && currentUser) {
-        const updatedUser = {
-          ...currentUser,
-          coins: currentUser.coins + ad.coinsReward,
-          watchedAds: [
-            ...currentUser.watchedAds,
-            { adId: currentAdId, lastWatched: new Date().toISOString() }
-          ]
-        };
-        setCurrentUser(updatedUser);
-        localStorage.setItem("coinQuestUser", JSON.stringify(updatedUser));
-        toast.success(`You earned ${ad.coinsReward} coins for watching the ad!`);
-      }
-      setCurrentAdId(null);
     }
 
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [isAdWatching, adTimeRemaining, currentAdId, ads, currentUser]);
+  }, [isAdWatching, adTimeRemaining, currentAdId]);
 
   const login = async (email: string, password: string) => {
-    // Mock login for demonstration
-    // In a real app, this would call an API
     try {
+      const isAdmin = isAdminUser(email, password);
+      
+      // Mock login for demonstration
       const mockUser: UserType = {
         id: "user1",
-        username: "demouser",
+        username: isAdmin ? "Admin" : "demouser",
         email: email,
-        coins: 100,
-        referralCode: "DEMO123",
+        coins: isAdmin ? 9999 : 100,
+        referralCode: isAdmin ? "ADMIN123" : "DEMO123",
         referrals: 0,
         completedTasks: [],
         watchedAds: [],
-        isAdmin: email === "admin@example.com"
+        isAdmin: isAdmin
       };
       
       setCurrentUser(mockUser);
@@ -432,6 +461,132 @@ export const CoinProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem("coinQuestUser", JSON.stringify(updatedUser));
   };
 
+  // Admin functions to update the app data
+  const updateTask = (taskId: string, updatedTask: Partial<TaskType>) => {
+    if (!currentUser?.isAdmin) {
+      toast.error("Only admins can update tasks");
+      return;
+    }
+
+    const updatedTasks = tasks.map(task => 
+      task.id === taskId ? { ...task, ...updatedTask } : task
+    );
+    setTasks(updatedTasks);
+    toast.success("Task updated successfully");
+  };
+
+  const updateAd = (adId: string, updatedAd: Partial<AdType>) => {
+    if (!currentUser?.isAdmin) {
+      toast.error("Only admins can update ads");
+      return;
+    }
+
+    const updatedAds = ads.map(ad => 
+      ad.id === adId ? { ...ad, ...updatedAd } : ad
+    );
+    setAds(updatedAds);
+    toast.success("Ad updated successfully");
+  };
+
+  const updateReward = (rewardId: string, updatedReward: Partial<RewardType>) => {
+    if (!currentUser?.isAdmin) {
+      toast.error("Only admins can update rewards");
+      return;
+    }
+
+    const updatedRewards = rewards.map(reward => 
+      reward.id === rewardId ? { ...reward, ...updatedReward } : reward
+    );
+    setRewards(updatedRewards);
+    toast.success("Reward updated successfully");
+  };
+
+  const addTask = (task: Omit<TaskType, "id" | "completed">) => {
+    if (!currentUser?.isAdmin) {
+      toast.error("Only admins can add tasks");
+      return;
+    }
+
+    const newTask: TaskType = {
+      ...task,
+      id: `task${Date.now()}`,
+      completed: false
+    };
+    setTasks([...tasks, newTask]);
+    toast.success("Task added successfully");
+  };
+
+  const addAd = (ad: Omit<AdType, "id">) => {
+    if (!currentUser?.isAdmin) {
+      toast.error("Only admins can add ads");
+      return;
+    }
+
+    const newAd: AdType = {
+      ...ad,
+      id: `ad${Date.now()}`
+    };
+    setAds([...ads, newAd]);
+    toast.success("Ad added successfully");
+  };
+
+  const addReward = (reward: Omit<RewardType, "id">) => {
+    if (!currentUser?.isAdmin) {
+      toast.error("Only admins can add rewards");
+      return;
+    }
+
+    const newReward: RewardType = {
+      ...reward,
+      id: `reward${Date.now()}`
+    };
+    setRewards([...rewards, newReward]);
+    toast.success("Reward added successfully");
+  };
+
+  const removeTask = (taskId: string) => {
+    if (!currentUser?.isAdmin) {
+      toast.error("Only admins can remove tasks");
+      return;
+    }
+
+    setTasks(tasks.filter(task => task.id !== taskId));
+    toast.success("Task removed successfully");
+  };
+
+  const removeAd = (adId: string) => {
+    if (!currentUser?.isAdmin) {
+      toast.error("Only admins can remove ads");
+      return;
+    }
+
+    setAds(ads.filter(ad => ad.id !== adId));
+    toast.success("Ad removed successfully");
+  };
+
+  const removeReward = (rewardId: string) => {
+    if (!currentUser?.isAdmin) {
+      toast.error("Only admins can remove rewards");
+      return;
+    }
+
+    setRewards(rewards.filter(reward => reward.id !== rewardId));
+    toast.success("Reward removed successfully");
+  };
+
+  const updateWithdrawalRequestStatus = (requestId: string, status: "pending" | "approved" | "rejected") => {
+    if (!currentUser?.isAdmin) {
+      toast.error("Only admins can update withdrawal requests");
+      return;
+    }
+
+    const updatedRequests = withdrawalRequests.map(request => 
+      request.id === requestId ? { ...request, status } : request
+    );
+    setWithdrawalRequests(updatedRequests);
+    toast.success(`Withdrawal request ${status}`);
+  };
+
   const coins = currentUser?.coins || 0;
   
   return (
@@ -458,7 +613,17 @@ export const CoinProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentAdId,
         adTimeRemaining,
         bannerAd,
-        topBannerAd
+        topBannerAd,
+        updateTask,
+        updateAd,
+        updateReward,
+        addTask,
+        addAd,
+        addReward,
+        removeTask,
+        removeAd,
+        removeReward,
+        updateWithdrawalRequestStatus
       }}
     >
       {children}

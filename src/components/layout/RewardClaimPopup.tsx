@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Coins } from "@/components/ui/Coins";
 import { Sparkles } from "lucide-react";
 import useSound from "use-sound";
+import { useCoin } from "@/context/CoinContext";
 
 interface RewardClaimPopupProps {
   open: boolean;
@@ -17,6 +18,7 @@ const RewardClaimPopup: React.FC<RewardClaimPopupProps> = ({
   onClose,
   coinsEarned,
 }) => {
+  const { currentUser } = useCoin();
   const [playSuccess] = useSound('/sounds/success.mp3');
 
   React.useEffect(() => {
@@ -39,9 +41,14 @@ const RewardClaimPopup: React.FC<RewardClaimPopupProps> = ({
           <div className="flex items-center justify-center text-3xl font-bold gap-2">
             {coinsEarned} <Coins className="h-6 w-6" />
           </div>
+          {currentUser && (
+            <p className="text-sm mt-4 text-muted-foreground">
+              Your balance: {currentUser.coins} coins
+            </p>
+          )}
         </div>
         <div className="flex justify-center">
-          <Button onClick={onClose}>Claim Rewards</Button>
+          <Button onClick={onClose} className="animate-pulse">Claim Rewards</Button>
         </div>
       </DialogContent>
     </Dialog>
