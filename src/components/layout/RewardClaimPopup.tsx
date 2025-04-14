@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -28,7 +27,6 @@ const RewardClaimPopup: React.FC<RewardClaimPopupProps> = ({
   }, [open, playSuccess]);
 
   const handleClaim = () => {
-    // Call the claimCoins function to update the user's balance
     claimCoins(coinsEarned);
     onClose();
   };
