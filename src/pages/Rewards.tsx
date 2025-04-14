@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Coins } from "@/components/ui/Coins";
-import { Amazon, Smartphone, CreditCard, AlertCircle } from "lucide-react";
+import { ShoppingBag, Smartphone, CreditCard, AlertCircle } from "lucide-react";
 import { useCoin } from "@/context/CoinContext";
 import MainLayout from "@/components/layout/MainLayout";
 
@@ -56,7 +55,7 @@ const Rewards = () => {
     switch (type) {
       case "amazon":
       case "googleplay":
-        return <Amazon className="h-6 w-6 text-[#FF9900]" />;
+        return <ShoppingBag className="h-6 w-6 text-[#FF9900]" />;
       case "freefire":
       case "pubg":
         return <Smartphone className="h-6 w-6 text-blue-500" />;
@@ -98,7 +97,6 @@ const Rewards = () => {
           {rewards.map((reward) => (
             <Card key={reward.id} className="overflow-hidden gift-card-item">
               <div className="aspect-[4/3] bg-muted flex items-center justify-center">
-                {/* Can be replaced with actual reward images */}
                 <div className="text-4xl">{getRewardIcon(reward.type)}</div>
               </div>
               <CardHeader>

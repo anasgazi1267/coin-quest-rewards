@@ -302,7 +302,7 @@ const Dashboard = () => {
                             <Badge 
                               variant={
                                 request.status === "approved" 
-                                  ? "success" 
+                                  ? "secondary" 
                                   : request.status === "rejected" 
                                   ? "destructive" 
                                   : "outline"
