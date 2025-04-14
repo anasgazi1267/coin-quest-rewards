@@ -18,7 +18,7 @@ const RewardClaimPopup: React.FC<RewardClaimPopupProps> = ({
   onClose,
   coinsEarned,
 }) => {
-  const { currentUser } = useCoin();
+  const { currentUser, claimCoins } = useCoin();
   const [playSuccess] = useSound('/sounds/success.mp3');
 
   React.useEffect(() => {
@@ -26,6 +26,12 @@ const RewardClaimPopup: React.FC<RewardClaimPopupProps> = ({
       playSuccess();
     }
   }, [open, playSuccess]);
+
+  const handleClaim = () => {
+    // Call the claimCoins function to update the user's balance
+    claimCoins(coinsEarned);
+    onClose();
+  };
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -48,7 +54,7 @@ const RewardClaimPopup: React.FC<RewardClaimPopupProps> = ({
           )}
         </div>
         <div className="flex justify-center">
-          <Button onClick={onClose} className="animate-pulse">Claim Rewards</Button>
+          <Button onClick={handleClaim} className="animate-pulse">Claim Rewards</Button>
         </div>
       </DialogContent>
     </Dialog>

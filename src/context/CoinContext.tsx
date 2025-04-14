@@ -7,7 +7,7 @@ type TaskType = {
   title: string;
   description: string;
   coinsReward: number;
-  type: "youtube" | "telegram" | "ad" | "referral" | "custom";
+  type: "youtube" | "telegram" | "ad" | "referral" | "custom" | "daily";
   completed: boolean;
   link?: string;
   durationInSeconds?: number;
@@ -52,6 +52,8 @@ type UserType = {
   completedTasks: string[];
   watchedAds: { adId: string; lastWatched: string }[];
   isAdmin: boolean;
+  dailyRewardClaimed?: boolean;
+  dailyRewardLastClaimed?: string;
 };
 
 interface CoinContextType {
@@ -87,6 +89,9 @@ interface CoinContextType {
   removeAd: (adId: string) => void;
   removeReward: (rewardId: string) => void;
   updateWithdrawalRequestStatus: (requestId: string, status: "pending" | "approved" | "rejected") => void;
+  claimCoins: (amount: number) => void;
+  claimDailyReward: () => void;
+  canClaimDailyReward: boolean;
 }
 
 const CoinContext = createContext<CoinContextType | undefined>(undefined);
@@ -112,6 +117,22 @@ const MOCK_TASKS: TaskType[] = [
     completed: false,
     link: "https://t.me/example",
     verificationRequired: true,
+  },
+  {
+    id: "task3",
+    title: "Daily Reward",
+    description: "Claim your daily reward to earn coins",
+    coinsReward: 25,
+    type: "daily",
+    completed: false,
+  },
+  {
+    id: "task4",
+    title: "Invite Friends",
+    description: "Invite 5 friends to earn bonus coins and unlock withdrawals",
+    coinsReward: 500,
+    type: "referral",
+    completed: false,
   },
 ];
 
@@ -209,6 +230,7 @@ export const CoinProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [adTimeRemaining, setAdTimeRemaining] = useState(0);
   const [bannerAd, setBannerAd] = useState("<div class='p-2 bg-blue-50 text-center'>Banner Ad Space Available</div>");
   const [topBannerAd, setTopBannerAd] = useState("<div class='p-1 bg-gray-50 text-xs text-center'>Top Banner Ad (468x60)</div>");
+  const [canClaimDailyReward, setCanClaimDailyReward] = useState(false);
 
   // Local storage management
   useEffect(() => {
@@ -218,18 +240,41 @@ export const CoinProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const storedRewards = localStorage.getItem("coinQuestRewards");
     const storedWithdrawalRequests = localStorage.getItem("coinQuestWithdrawalRequests");
     const storedUser = localStorage.getItem("coinQuestUser");
+    const storedReferralReward = localStorage.getItem("coinQuestReferralReward");
+    const storedMinWithdrawalCoins = localStorage.getItem("coinQuestMinWithdrawalCoins");
     
     if (storedTasks) setTasks(JSON.parse(storedTasks));
     if (storedAds) setAds(JSON.parse(storedAds));
     if (storedRewards) setRewards(JSON.parse(storedRewards));
     if (storedWithdrawalRequests) setWithdrawalRequests(JSON.parse(storedWithdrawalRequests));
+    if (storedReferralReward) setReferralReward(JSON.parse(storedReferralReward));
+    if (storedMinWithdrawalCoins) setMinWithdrawalCoins(JSON.parse(storedMinWithdrawalCoins));
     
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
       setCurrentUser(parsedUser);
       setIsAuthenticated(true);
+      
+      // Check if daily reward is claimable
+      checkDailyRewardEligibility(parsedUser);
     }
   }, []);
+
+  // Check if user is eligible for daily reward
+  const checkDailyRewardEligibility = (user: UserType) => {
+    if (!user.dailyRewardLastClaimed) {
+      setCanClaimDailyReward(true);
+      return;
+    }
+    
+    const lastClaimed = new Date(user.dailyRewardLastClaimed);
+    const now = new Date();
+    const isNewDay = lastClaimed.getDate() !== now.getDate() || 
+                     lastClaimed.getMonth() !== now.getMonth() ||
+                     lastClaimed.getFullYear() !== now.getFullYear();
+                     
+    setCanClaimDailyReward(isNewDay);
+  };
 
   // Save data to localStorage whenever it changes
   useEffect(() => {
@@ -247,6 +292,21 @@ export const CoinProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     localStorage.setItem("coinQuestWithdrawalRequests", JSON.stringify(withdrawalRequests));
   }, [withdrawalRequests]);
+
+  useEffect(() => {
+    localStorage.setItem("coinQuestReferralReward", JSON.stringify(referralReward));
+  }, [referralReward]);
+
+  useEffect(() => {
+    localStorage.setItem("coinQuestMinWithdrawalCoins", JSON.stringify(minWithdrawalCoins));
+  }, [minWithdrawalCoins]);
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem("coinQuestUser", JSON.stringify(currentUser));
+      checkDailyRewardEligibility(currentUser);
+    }
+  }, [currentUser]);
 
   // Ad timer effect
   useEffect(() => {
@@ -270,22 +330,47 @@ export const CoinProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const isAdmin = isAdminUser(email, password);
       
-      // Mock login for demonstration
-      const mockUser: UserType = {
-        id: "user1",
-        username: isAdmin ? "Admin" : "demouser",
-        email: email,
-        coins: isAdmin ? 9999 : 100,
-        referralCode: isAdmin ? "ADMIN123" : "DEMO123",
-        referrals: 0,
-        completedTasks: [],
-        watchedAds: [],
-        isAdmin: isAdmin
-      };
+      // Load existing users from localStorage or create new mock user
+      const existingUsers = localStorage.getItem("coinQuestUsers");
+      let users = existingUsers ? JSON.parse(existingUsers) : [];
+      let user = users.find((u: UserType) => u.email === email);
       
-      setCurrentUser(mockUser);
+      if (!user) {
+        if (isAdmin) {
+          // Create admin user
+          user = {
+            id: "admin1",
+            username: "Admin",
+            email: email,
+            coins: 9999,
+            referralCode: "ADMIN123",
+            referrals: 0,
+            completedTasks: [],
+            watchedAds: [],
+            isAdmin: true
+          };
+        } else {
+          // Create regular user
+          user = {
+            id: `user${Date.now()}`,
+            username: email.split('@')[0],
+            email: email,
+            coins: 100,
+            referralCode: `USER${Math.floor(Math.random() * 10000)}`,
+            referrals: 0,
+            completedTasks: [],
+            watchedAds: [],
+            isAdmin: false
+          };
+        }
+        
+        users.push(user);
+        localStorage.setItem("coinQuestUsers", JSON.stringify(users));
+      }
+      
+      setCurrentUser(user);
       setIsAuthenticated(true);
-      localStorage.setItem("coinQuestUser", JSON.stringify(mockUser));
+      localStorage.setItem("coinQuestUser", JSON.stringify(user));
       toast.success("Login successful!");
     } catch (error) {
       toast.error("Login failed. Please try again.");
@@ -301,8 +386,17 @@ export const CoinProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const registerUser = async (username: string, email: string, password: string) => {
-    // Mock registration for demonstration
     try {
+      // Load existing users
+      const existingUsers = localStorage.getItem("coinQuestUsers");
+      let users = existingUsers ? JSON.parse(existingUsers) : [];
+      
+      // Check if user already exists
+      if (users.some((u: UserType) => u.email === email)) {
+        toast.error("User with this email already exists");
+        throw new Error("User already exists");
+      }
+      
       const newUser: UserType = {
         id: `user${Date.now()}`,
         username,
@@ -315,6 +409,11 @@ export const CoinProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAdmin: false
       };
       
+      // Add user to users array
+      users.push(newUser);
+      localStorage.setItem("coinQuestUsers", JSON.stringify(users));
+      
+      // Set as current user
       setCurrentUser(newUser);
       setIsAuthenticated(true);
       localStorage.setItem("coinQuestUser", JSON.stringify(newUser));
@@ -357,7 +456,9 @@ export const CoinProvider: React.FC<{ children: React.ReactNode }> = ({ children
       completedTasks: [...currentUser.completedTasks, taskId]
     };
     setCurrentUser(updatedUser);
-    localStorage.setItem("coinQuestUser", JSON.stringify(updatedUser));
+    
+    // Update in users array
+    updateUserInStorage(updatedUser);
     
     toast.success(`Task completed! You earned ${task.coinsReward} coins`);
   };
@@ -383,6 +484,91 @@ export const CoinProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return Promise.resolve();
   };
 
+  // New function to claim coins after watching ad
+  const claimCoins = (amount: number) => {
+    if (!currentUser) {
+      toast.error("You must be logged in to claim coins");
+      return;
+    }
+    
+    if (!currentAdId) {
+      toast.error("No ad to claim from");
+      return;
+    }
+    
+    // Record that the user watched the ad
+    const now = new Date().toISOString();
+    const updatedWatchedAds = [
+      ...currentUser.watchedAds, 
+      { adId: currentAdId, lastWatched: now }
+    ];
+    
+    // Update user with coins and watched ad
+    const updatedUser = {
+      ...currentUser,
+      coins: currentUser.coins + amount,
+      watchedAds: updatedWatchedAds
+    };
+    
+    setCurrentUser(updatedUser);
+    setCurrentAdId(null);
+    
+    // Update in users array
+    updateUserInStorage(updatedUser);
+    
+    toast.success(`You earned ${amount} coins!`);
+  };
+
+  // New function to claim daily reward
+  const claimDailyReward = () => {
+    if (!currentUser) {
+      toast.error("You must be logged in to claim daily reward");
+      return;
+    }
+    
+    if (!canClaimDailyReward) {
+      toast.error("You've already claimed your daily reward today");
+      return;
+    }
+    
+    // Find daily reward task
+    const dailyTask = tasks.find(t => t.type === "daily");
+    if (!dailyTask) {
+      toast.error("Daily reward task not found");
+      return;
+    }
+    
+    // Update user
+    const updatedUser = {
+      ...currentUser,
+      coins: currentUser.coins + dailyTask.coinsReward,
+      dailyRewardLastClaimed: new Date().toISOString(),
+      dailyRewardClaimed: true
+    };
+    
+    setCurrentUser(updatedUser);
+    setCanClaimDailyReward(false);
+    
+    // Update in users array
+    updateUserInStorage(updatedUser);
+    
+    toast.success(`Daily reward claimed! You earned ${dailyTask.coinsReward} coins.`);
+  };
+
+  // Helper function to update user in storage
+  const updateUserInStorage = (updatedUser: UserType) => {
+    // Update current user in localStorage
+    localStorage.setItem("coinQuestUser", JSON.stringify(updatedUser));
+    
+    // Update user in users array
+    const existingUsers = localStorage.getItem("coinQuestUsers");
+    if (existingUsers) {
+      let users = JSON.parse(existingUsers);
+      users = users.map((u: UserType) => u.id === updatedUser.id ? updatedUser : u);
+      localStorage.setItem("coinQuestUsers", JSON.stringify(users));
+    }
+  };
+
   const requestWithdrawal = async (rewardId: string, gameUsername?: string, gameId?: string) => {
     if (!currentUser) {
       toast.error("You must be logged in to request withdrawals");
@@ -405,6 +591,12 @@ export const CoinProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Check minimum withdrawal requirement
     if (currentUser.coins < minWithdrawalCoins) {
       toast.error(`You need at least ${minWithdrawalCoins} coins to request a withdrawal`);
+      return false;
+    }
+
+    // Check if user has enough referrals (5 required)
+    if (currentUser.referrals < 5) {
+      toast.error(`You need at least 5 referrals to request a withdrawal. You have ${currentUser.referrals} referrals.`);
       return false;
     }
 
@@ -434,7 +626,9 @@ export const CoinProvider: React.FC<{ children: React.ReactNode }> = ({ children
       coins: currentUser.coins - reward.coinsCost
     };
     setCurrentUser(updatedUser);
-    localStorage.setItem("coinQuestUser", JSON.stringify(updatedUser));
+    
+    // Update in users array
+    updateUserInStorage(updatedUser);
 
     toast.success("Withdrawal request submitted! It will be processed soon.");
     return true;
@@ -446,19 +640,52 @@ export const CoinProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // In a real app, we would validate the code against a database
-    // For this demo, we'll simulate a successful referral
+    // Load existing users
+    const existingUsers = localStorage.getItem("coinQuestUsers");
+    if (!existingUsers) {
+      toast.error("Failed to process referral code");
+      return;
+    }
     
-    // Update the referring user (would be fetched from backend in real app)
-    toast.success(`Referral code ${code} applied! You earned 50 bonus coins.`);
+    const users = JSON.parse(existingUsers);
+    
+    // Find referring user
+    const referrer = users.find((u: UserType) => u.referralCode === code);
+    if (!referrer) {
+      toast.error("Invalid referral code");
+      return;
+    }
+    
+    if (referrer.id === currentUser.id) {
+      toast.error("You cannot use your own referral code");
+      return;
+    }
     
     // Update current user
     const updatedUser = {
       ...currentUser,
-      coins: currentUser.coins + 50,
+      coins: currentUser.coins + referralReward,
     };
     setCurrentUser(updatedUser);
+    
+    // Update referrer
+    const updatedReferrer = {
+      ...referrer,
+      referrals: referrer.referrals + 1,
+      coins: referrer.coins + referralReward
+    };
+    
+    // Update both users in storage
+    const updatedUsers = users.map((u: UserType) => {
+      if (u.id === currentUser.id) return updatedUser;
+      if (u.id === referrer.id) return updatedReferrer;
+      return u;
+    });
+    
+    localStorage.setItem("coinQuestUsers", JSON.stringify(updatedUsers));
     localStorage.setItem("coinQuestUser", JSON.stringify(updatedUser));
+    
+    toast.success(`Referral code ${code} applied! You earned ${referralReward} bonus coins.`);
   };
 
   // Admin functions to update the app data
@@ -623,7 +850,10 @@ export const CoinProvider: React.FC<{ children: React.ReactNode }> = ({ children
         removeTask,
         removeAd,
         removeReward,
-        updateWithdrawalRequestStatus
+        updateWithdrawalRequestStatus,
+        claimCoins,
+        claimDailyReward,
+        canClaimDailyReward
       }}
     >
       {children}

@@ -1,6 +1,5 @@
 
 import React, { useEffect, useState } from "react";
-import { X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Coins } from "@/components/ui/Coins";
 import { Button } from "@/components/ui/button";
@@ -14,7 +13,7 @@ interface AdPopupProps {
 }
 
 const AdPopup: React.FC<AdPopupProps> = ({ adId, onClose, open }) => {
-  const { ads, watchAd, isAdWatching, adTimeRemaining, currentAdId } = useCoin();
+  const { ads, watchAd, isAdWatching, adTimeRemaining, currentAdId, currentUser } = useCoin();
   const [showRewardClaim, setShowRewardClaim] = useState(false);
   const [canClaim, setCanClaim] = useState(false);
   
@@ -33,7 +32,10 @@ const AdPopup: React.FC<AdPopupProps> = ({ adId, onClose, open }) => {
   }, [adTimeRemaining, isAdWatching]);
 
   const handleClaim = () => {
-    setShowRewardClaim(true);
+    if (currentAd && currentUser) {
+      // Update user's coins in context when claimed
+      setShowRewardClaim(true);
+    }
   };
 
   const handleClaimComplete = () => {
