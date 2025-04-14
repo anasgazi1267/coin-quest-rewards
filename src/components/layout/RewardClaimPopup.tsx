@@ -3,7 +3,7 @@ import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Coins } from "@/components/ui/Coins";
-import { Party } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import useSound from "use-sound";
 
 interface RewardClaimPopupProps {
@@ -30,7 +30,7 @@ const RewardClaimPopup: React.FC<RewardClaimPopupProps> = ({
       <DialogContent className="sm:max-w-md text-center">
         <DialogHeader>
           <DialogTitle className="text-2xl flex items-center justify-center gap-2">
-            <Party className="h-8 w-8 text-yellow-500" />
+            <Sparkles className="h-8 w-8 text-yellow-500" />
             Congratulations!
           </DialogTitle>
         </DialogHeader>
